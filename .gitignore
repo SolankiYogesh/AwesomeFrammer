@@ -31,7 +31,6 @@ local.properties
 *.iml
 *.hprof
 .cxx/
-*.keystore
 !debug.keystore
 
 # node.js
@@ -72,3 +71,10 @@ yarn-error.log
 !.yarn/releases
 !.yarn/sdks
 !.yarn/versions
+
+package-lock.json
+yarn.lock
+Gemfile.lock
+/ios/Podfile.lock
+android/app/release/app-release.apk
+android/app/release/output-metadata.json

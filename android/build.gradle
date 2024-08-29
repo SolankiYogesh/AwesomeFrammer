@@ -17,5 +17,16 @@ buildscript {
         classpath("org.jetbrains.kotlin:kotlin-gradle-plugin")
     }
 }
+allprojects {
+    repositories {
+        mavenLocal()
+        google()
+        mavenCentral()
+        maven {
+            // All of React Native (JS, Obj-C sources, Android binaries) is installed from npm
+            url "$rootDir/../node_modules/react-native-video-cache/android/libs"
+        }
+    }
+}
 
 apply plugin: "com.facebook.react.rootproject"

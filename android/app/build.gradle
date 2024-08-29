@@ -71,7 +71,9 @@ def enableProguardInReleaseBuilds = false
  * this variant is about 6MiB larger per architecture than default.
  */
 def jscFlavor = 'org.webkit:android-jsc:+'
-
+def versionMajor = 1
+def versionMinor = 0
+def versionPatch = 1
 android {
     ndkVersion rootProject.ext.ndkVersion
     buildToolsVersion rootProject.ext.buildToolsVersion
@@ -82,8 +84,8 @@ android {
         applicationId "com.awesomeframmer"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 1
-        versionName "1.0"
+        versionCode versionPatch
+        versionName "${versionMajor}.${versionMinor}.${versionPatch}"
     }
     signingConfigs {
         debug {
@@ -108,8 +110,12 @@ android {
 }
 
 dependencies {
+       def work_version = "2.9.0"
+    implementation 'androidx.work:work-runtime-ktx:' + work_version
     // The version of react-native is set by the React Native Gradle Plugin
     implementation("com.facebook.react:react-android")
+    implementation "org.apache.httpcomponents:httpclient-android:4.3.5.1"
+    implementation 'com.danikula:videocache:2.7.1'
 
     if (hermesEnabled.toBoolean()) {
         implementation("com.facebook.react:hermes-android")
@@ -117,3 +123,5 @@ dependencies {
         implementation jscFlavor
     }
 }
+
+apply from: file("../../node_modules/react-native-vector-icons/fonts.gradle")

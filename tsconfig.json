@@ -1,3 +1,18 @@
 {
-  "extends": "@react-native/typescript-config/tsconfig.json"
+  "extends": "@react-native/typescript-config/tsconfig.json",
+  "compilerOptions": {
+    "jsx": "react",
+    /* Visit https://aka.ms/tsconfig.json to read more about this file */
+
+    /* Completeness */
+    "skipLibCheck": true,
+    "rootDir": ".",
+    "paths": {
+      "@/*": ["./src/*"]
+    }
+    /* Skip type checking all .d.ts files. */
+  },
+  "typeRoots": ["./src/Types"],
+  "include": ["."],
+  "exclude": ["node_modules"] /* Specify an array of glob patterns to exclude. */
 }

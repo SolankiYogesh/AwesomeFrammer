@@ -1,0 +1,58 @@
+diff --git a/node_modules/react-native-video/lib/types/video.d.ts b/node_modules/react-native-video/lib/types/video.d.ts
+index 75516b3..83ac99e 100644
+--- a/node_modules/react-native-video/lib/types/video.d.ts
++++ b/node_modules/react-native-video/lib/types/video.d.ts
+@@ -226,4 +226,5 @@ export interface ReactVideoProps extends ReactVideoEvents, ViewProps {
+     debug?: DebugConfig;
+     allowsExternalPlayback?: boolean;
+     controlsStyles?: ControlsStyles;
++    renderPoster?: ReactNode;
+ }
+diff --git a/node_modules/react-native-video/src/Video.tsx b/node_modules/react-native-video/src/Video.tsx
+index 49ca1e9..5512f63 100644
+--- a/node_modules/react-native-video/src/Video.tsx
++++ b/node_modules/react-native-video/src/Video.tsx
+@@ -115,6 +115,7 @@ const Video = forwardRef<VideoRef, ReactVideoProps>(
+       onTextTrackDataChanged,
+       onVideoTracks,
+       onAspectRatio,
++      renderPoster,
+       ...rest
+     },
+     ref,
+@@ -128,12 +129,8 @@ const Video = forwardRef<VideoRef, ReactVideoProps>(
+         return true;
+       }
+ 
+-      if (isPosterDeprecated) {
+-        return !!poster;
+-      }
+-
+-      return !!poster?.source;
+-    }, [isPosterDeprecated, poster, renderLoader]);
++     return true
++    }, [renderLoader]);
+ 
+     const [showPoster, setShowPoster] = useState(hasPoster);
+ 
+@@ -613,6 +610,10 @@ const Video = forwardRef<VideoRef, ReactVideoProps>(
+         return null;
+       }
+ 
++      if(renderPoster){
++        return renderPoster
++      }
++
+       // poster resize mode
+       let _posterResizeMode: ImageResizeMode = 'contain';
+ 
+diff --git a/node_modules/react-native-video/src/types/video.ts b/node_modules/react-native-video/src/types/video.ts
+index eb075f9..a1fe492 100644
+--- a/node_modules/react-native-video/src/types/video.ts
++++ b/node_modules/react-native-video/src/types/video.ts
+@@ -287,4 +287,5 @@ export interface ReactVideoProps extends ReactVideoEvents, ViewProps {
+   debug?: DebugConfig;
+   allowsExternalPlayback?: boolean; // iOS
+   controlsStyles?: ControlsStyles; // Android
++  renderPoster?: ReactNode;
+ }

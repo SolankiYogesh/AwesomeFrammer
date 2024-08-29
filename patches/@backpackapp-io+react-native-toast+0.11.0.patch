@@ -1,0 +1,1597 @@
+diff --git a/node_modules/@backpackapp-io/react-native-toast/lib/typescript/core/toast.d.ts b/node_modules/@backpackapp-io/react-native-toast/lib/typescript/core/toast.d.ts
+index 68eee48..289af0e 100644
+--- a/node_modules/@backpackapp-io/react-native-toast/lib/typescript/core/toast.d.ts
++++ b/node_modules/@backpackapp-io/react-native-toast/lib/typescript/core/toast.d.ts
+@@ -1,6 +1,6 @@
+ import { DefaultToastOptions, Element, Toast, ToastOptions, ValueOrFunction } from './types';
+ declare type Message = ValueOrFunction<Element, Toast>;
+-declare type ToastHandler = (message: Message, options?: ToastOptions) => string;
++declare type ToastHandler = (message: Message,title:string, options?: ToastOptions) => string;
+ declare const toast: {
+     (message: Message, opts?: ToastOptions): string;
+     error: ToastHandler;
+diff --git a/node_modules/@backpackapp-io/react-native-toast/lib/typescript/core/types.d.ts b/node_modules/@backpackapp-io/react-native-toast/lib/typescript/core/types.d.ts
+index c103905..1eeddde 100644
+--- a/node_modules/@backpackapp-io/react-native-toast/lib/typescript/core/types.d.ts
++++ b/node_modules/@backpackapp-io/react-native-toast/lib/typescript/core/types.d.ts
+@@ -1,5 +1,5 @@
+ /// <reference types="react" />
+-import type { TextStyle, ViewStyle } from 'react-native';
++import type { ImageSourcePropType, TextStyle, ViewStyle } from 'react-native';
+ export declare type ToastType = 'success' | 'error' | 'loading' | 'blank';
+ export declare enum ToastPosition {
+     TOP = 1,
+@@ -25,6 +25,7 @@ export interface Toast {
+     createdAt: number;
+     visible: boolean;
+     height?: number;
++    image?: ImageSourcePropType;
+     width?: number;
+     styles?: {
+         pressable?: ViewStyle;
+@@ -34,6 +35,8 @@ export interface Toast {
+     };
+     customToast?: (toast: Toast) => JSX.Element;
+     providerKey: string;
++         onPressButton?: () =>void,
++          btnTitle:string
+     isSwipeable?: boolean;
+     animationConfig?: {
+         flingPositionReturnDuration?: number;
+@@ -41,7 +44,7 @@ export interface Toast {
+         animationDuration?: number;
+     };
+ }
+-export declare type ToastOptions = Partial<Pick<Toast, 'id' | 'icon' | 'duration' | 'position' | 'styles' | 'height' | 'width' | 'customToast' | 'disableShadow' | 'providerKey' | 'isSwipeable' | 'animationConfig'>>;
++export declare type ToastOptions = Partial<Pick<Toast, 'id' |"image"| "onPressButton"|"btnTitle"| 'icon' | 'duration' | 'position' | 'styles' | 'height' | 'width' | 'customToast' | 'disableShadow' | 'providerKey' | 'isSwipeable' | 'animationConfig'>>;
+ export declare type DefaultToastOptions = ToastOptions & {
+     [key in ToastType]?: ToastOptions;
+ };
+diff --git a/node_modules/@backpackapp-io/react-native-toast/src/components/Toast.tsx b/node_modules/@backpackapp-io/react-native-toast/src/components/Toast.tsx
+index c598db6..419ffe5 100644
+--- a/node_modules/@backpackapp-io/react-native-toast/src/components/Toast.tsx
++++ b/node_modules/@backpackapp-io/react-native-toast/src/components/Toast.tsx
+@@ -1,60 +1,51 @@
+-import React, { FC, useCallback, useEffect, useMemo, useState } from 'react';
++/* eslint-disable react-native/no-color-literals */
++/* eslint-disable react-native/no-inline-styles */
++import React, {FC, useCallback, useEffect, useMemo, useState} from 'react'
+ import {
++  Image,
+   Platform,
+   Pressable,
+   Text,
+   TextStyle,
+-  useColorScheme,
++  TouchableOpacity,
+   useWindowDimensions,
+   View,
+-  ViewStyle,
+-} from 'react-native';
++  ViewStyle
++} from 'react-native'
++import {Directions, Gesture, GestureDetector} from 'react-native-gesture-handler'
+ import Animated, {
+   runOnJS,
+   useAnimatedStyle,
+   useSharedValue,
+   withSpring,
+-  withTiming,
+-} from 'react-native-reanimated';
+-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+-import {
+-  Directions,
+-  Gesture,
+-  GestureDetector,
+-} from 'react-native-gesture-handler';
++  withTiming
++} from 'react-native-reanimated'
++import {useSafeAreaInsets} from 'react-native-safe-area-context'
+ 
+-import type { ExtraInsets, Toast as ToastType } from '../core/types';
+-import { resolveValue, Toast as T, ToastPosition } from '../core/types';
+-import {
+-  colors,
+-  ConstructShadow,
+-  useKeyboard,
+-  useVisibilityChange,
+-} from '../utils';
+-import { toast as toasting } from '../headless';
++import type {ExtraInsets, Toast as ToastType} from '../core/types'
++import {resolveValue, ToastPosition} from '../core/types'
++import {toast as toasting} from '../headless'
++import {colors, ConstructShadow, useKeyboard} from '../utils'
++import {Images} from '@/Theme'
+ 
+-const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
+-const DEFAULT_TOAST_HEIGHT = 50;
++const AnimatedPressable = Animated.createAnimatedComponent(Pressable)
++const DEFAULT_TOAST_HEIGHT = 50
+ 
+ type Props = {
+-  toast: ToastType;
+-  updateHeight: (toastId: string, height: number) => void;
+-  offset: number;
+-  endPause: () => void;
+-  startPause: () => void;
+-  customRenderer?: (toast: ToastType) => React.ReactNode;
+-  overrideDarkMode?: boolean;
+-  onToastShow?: (toast: T) => void;
+-  onToastHide?: (toast: T) => void;
+-  onToastPress?: (toast: T) => void;
+-  extraInsets?: ExtraInsets;
++  toast: ToastType
++  updateHeight: (toastId: string, height: number) => void
++  offset: number
++  endPause: () => void
++  startPause: () => void
++  customRenderer?: (toast: ToastType) => React.ReactNode
++  extraInsets?: ExtraInsets
+   defaultStyle?: {
+-    pressable?: ViewStyle;
+-    view?: ViewStyle;
+-    text?: TextStyle;
+-    indicator?: ViewStyle;
+-  };
+-};
++    pressable?: ViewStyle
++    view?: ViewStyle
++    text?: TextStyle
++    indicator?: ViewStyle
++  }
++}
+ 
+ export const Toast: FC<Props> = ({
+   toast,
+@@ -62,67 +53,48 @@ export const Toast: FC<Props> = ({
+   offset,
+   startPause,
+   endPause,
+-  overrideDarkMode,
+-  onToastHide,
+-  onToastPress,
+-  onToastShow,
+   extraInsets,
+-  defaultStyle,
++  defaultStyle
+ }) => {
+-  const insets = useSafeAreaInsets();
+-  const { width, height } = useWindowDimensions();
+-  const { keyboardShown: keyboardVisible, keyboardHeight } = useKeyboard();
+-
+-  useVisibilityChange(
+-    () => {
+-      onToastShow?.(toast);
+-    },
+-    () => {
+-      onToastHide?.(toast);
+-    },
+-    toast.visible
+-  );
+-
+-  const isSystemDarkMode = useColorScheme() === 'dark';
+-  const isDarkMode =
+-    overrideDarkMode !== undefined ? overrideDarkMode : isSystemDarkMode;
++  const insets = useSafeAreaInsets()
++  const {width, height} = useWindowDimensions()
++  const {keyboardShown: keyboardVisible, keyboardHeight} = useKeyboard()
+ 
+   const [toastHeight, setToastHeight] = useState<number>(
+     toast?.height ? toast.height : DEFAULT_TOAST_HEIGHT
+-  );
++  )
+   const [toastWidth, setToastWidth] = useState<number>(
+     toast?.width ? toast.width : width - 32 > 360 ? 360 : width - 32
+-  );
++  )
+ 
+   const startingY = useMemo(
+     () =>
+       toast.position === ToastPosition.TOP
+         ? -(toast.height || DEFAULT_TOAST_HEIGHT) - insets.top - 50
+-        : height - insets.bottom - Platform.select({ ios: 0, default: 32 }),
++        : height - insets.bottom - Platform.select({ios: 0, default: 32}),
+     [height, toast.position, insets.bottom, insets.top, toast.height]
+-  );
++  )
+ 
+-  const opacity = useSharedValue(0);
+-  const position = useSharedValue(startingY);
+-  const offsetY = useSharedValue(startingY);
++  const opacity = useSharedValue(0)
++  const position = useSharedValue(startingY)
++  const offsetY = useSharedValue(startingY)
+ 
+-  const onPress = () => onToastPress?.(toast);
+   const dismiss = useCallback((id: string) => {
+-    toasting.dismiss(id);
+-  }, []);
++    toasting.dismiss(id)
++  }, [])
+ 
+   const setPosition = useCallback(() => {
+-    //control the position of the toast when rendering
+-    //based on offset, visibility, keyboard, and toast height
++    // control the position of the toast when rendering
++    // based on offset, visibility, keyboard, and toast height
+     if (toast.position === ToastPosition.TOP) {
+       offsetY.value = withTiming(toast.visible ? offset : startingY, {
+-        duration: toast?.animationConfig?.animationDuration ?? 300,
+-      });
++        duration: toast?.animationConfig?.animationDuration ?? 300
++      })
+       position.value = withTiming(toast.visible ? offset : startingY, {
+-        duration: toast?.animationConfig?.animationDuration ?? 300,
+-      });
++        duration: toast?.animationConfig?.animationDuration ?? 300
++      })
+     } else {
+-      let kbHeight = keyboardVisible ? keyboardHeight : 0;
++      const kbHeight = keyboardVisible ? keyboardHeight : 0
+       const val = toast.visible
+         ? startingY -
+           toastHeight -
+@@ -131,15 +103,15 @@ export const Toast: FC<Props> = ({
+           insets.bottom -
+           (extraInsets?.bottom ?? 0) -
+           24
+-        : startingY;
++        : startingY
+ 
+       offsetY.value = withSpring(val, {
+-        stiffness: toast?.animationConfig?.animationStiffness ?? 80,
+-      });
++        stiffness: toast?.animationConfig?.animationStiffness ?? 80
++      })
+ 
+       position.value = withSpring(val, {
+-        stiffness: toast?.animationConfig?.animationStiffness ?? 80,
+-      });
++        stiffness: toast?.animationConfig?.animationStiffness ?? 80
++      })
+     }
+   }, [
+     offset,
+@@ -153,32 +125,28 @@ export const Toast: FC<Props> = ({
+     toast.position,
+     offsetY,
+     extraInsets,
+-    toast.animationConfig,
+-  ]);
++    toast.animationConfig
++  ])
+ 
+   const composedGesture = useMemo(() => {
+     const panGesture = Gesture.Pan()
+       .onUpdate((e) => {
+-        offsetY.value = e.translationY / 4 + position.value;
++        offsetY.value = e.translationY / 4 + position.value
+       })
+       .onEnd(() => {
+-        runOnJS(setPosition)();
+-      });
++        runOnJS(setPosition)()
++      })
+ 
+     const flingGesture = Gesture.Fling()
+-      .direction(
+-        toast.position === ToastPosition.TOP ? Directions.UP : Directions.DOWN
+-      )
++      .direction(toast.position === ToastPosition.TOP ? Directions.UP : Directions.DOWN)
+       .onEnd(() => {
+         offsetY.value = withTiming(startingY, {
+-          duration: toast?.animationConfig?.flingPositionReturnDuration ?? 40,
+-        });
+-        runOnJS(dismiss)(toast.id);
+-      });
++          duration: toast?.animationConfig?.flingPositionReturnDuration ?? 40
++        })
++        runOnJS(dismiss)(toast.id)
++      })
+ 
+-    return toast.isSwipeable
+-      ? Gesture.Simultaneous(flingGesture, panGesture)
+-      : panGesture;
++    return toast.isSwipeable ? Gesture.Simultaneous(flingGesture, panGesture) : panGesture
+   }, [
+     offsetY,
+     startingY,
+@@ -188,154 +156,168 @@ export const Toast: FC<Props> = ({
+     toast.id,
+     dismiss,
+     toast.isSwipeable,
+-    toast.animationConfig,
+-  ]);
++    toast.animationConfig
++  ])
+ 
+   useEffect(() => {
+-    //set the toast height if it updates while rendered
+-    setToastHeight(toast?.height ? toast.height : DEFAULT_TOAST_HEIGHT);
+-  }, [toast.height]);
++    // set the toast height if it updates while rendered
++    setToastHeight(toast?.height ? toast.height : DEFAULT_TOAST_HEIGHT)
++  }, [toast.height])
+ 
+   useEffect(() => {
+-    //set the toast width if it updates while rendered
+-    setToastWidth(
+-      toast?.width ? toast.width : width - 32 > 360 ? 360 : width - 32
+-    );
+-  }, [toast.width, width]);
++    // set the toast width if it updates while rendered
++    setToastWidth(toast?.width ? toast.width : width - 32 > 360 ? 360 : width - 32)
++  }, [toast.width, width])
+ 
+   useEffect(() => {
+-    //Control visibility of toast when rendering
++    // Control visibility of toast when rendering
+     opacity.value = withTiming(toast.visible ? 1 : 0, {
+-      duration: toast?.animationConfig?.animationDuration ?? 300,
+-    });
+-  }, [toast.visible, opacity, toast.animationConfig]);
++      duration: toast?.animationConfig?.animationDuration ?? 300
++    })
++  }, [toast.visible, opacity, toast.animationConfig])
+ 
+   useEffect(() => {
+-    setPosition();
+-  }, [
+-    offset,
+-    toast.visible,
+-    keyboardVisible,
+-    keyboardHeight,
+-    toastHeight,
+-    setPosition,
+-  ]);
++    setPosition()
++  }, [offset, toast.visible, keyboardVisible, keyboardHeight, toastHeight, setPosition])
+ 
+   const style = useAnimatedStyle(() => {
+-    //Control opacity and translation of toast
++    // Control opacity and translation of toast
+     return {
+       opacity: opacity.value,
+       transform: [
+         {
+-          translateY: offsetY.value,
+-        },
+-      ],
+-    };
+-  });
++          translateY: offsetY.value
++        }
++      ]
++    }
++  })
+ 
+   return (
+     <GestureDetector key={toast.id} gesture={composedGesture}>
+       <AnimatedPressable
+         onPressIn={startPause}
+         onPressOut={() => {
+-          endPause();
++          endPause()
+         }}
+-        onPress={onPress}
+         style={[
++          // eslint-disable-next-line react-native/no-inline-styles
+           {
+-            backgroundColor: !toast.customToast
+-              ? isDarkMode
+-                ? colors.backgroundDark
+-                : colors.backgroundLight
+-              : undefined,
++            backgroundColor: colors.backgroundLight,
+             borderRadius: 8,
+             position: 'absolute',
+-            left: (width - toastWidth) / 2,
++            right: 20,
+             zIndex: toast.visible ? 9999 : undefined,
+             alignItems: 'center',
+             justifyContent: 'center',
++            overflow: 'hidden'
+           },
+           style,
+           !toast.disableShadow && ConstructShadow('#181821', 0.15, false),
+           defaultStyle?.pressable,
+-          toast.styles?.pressable,
++          toast.styles?.pressable
+         ]}
+       >
+         {toast.customToast ? (
+           <View
+-            onLayout={(event) =>
+-              updateHeight(toast.id, event.nativeEvent.layout.height)
+-            }
++            onLayout={(event) => updateHeight(toast.id, event.nativeEvent.layout.height)}
+             key={toast.id}
+           >
+             {toast.customToast({
+               ...toast,
+               height: toastHeight,
+-              width: toastWidth,
++              width: toastWidth
+             })}
+           </View>
+         ) : (
+           <View
+-            onLayout={(event) =>
+-              updateHeight(toast.id, event.nativeEvent.layout.height)
+-            }
+-            style={[
+-              {
+-                minHeight: toastHeight,
+-                width: toastWidth,
+-                flexDirection: 'row',
+-                alignItems: 'center',
+-                paddingVertical: 12,
+-                paddingHorizontal: 16,
+-              },
+-              defaultStyle?.view,
+-              toast.styles?.view,
+-            ]}
++            onLayout={(event) => updateHeight(toast.id, event.nativeEvent.layout.height)}
++            style={{
++              minHeight: toastHeight,
++              width: toastWidth,
++              flexDirection: 'row',
++              // alignItems: 'center',
++              paddingVertical: 12,
++              paddingHorizontal: 16,
++              backgroundColor: 'white',
++              gap: 20
++            }}
+             key={toast.id}
+           >
+-            {(toast.type === 'error' || toast.type === 'success') && (
+-              <View
+-                style={[
+-                  {
+-                    backgroundColor:
+-                      toast.type === 'error'
+-                        ? colors.error
+-                        : toast.type === 'success'
+-                        ? colors.success
+-                        : isDarkMode
+-                        ? colors.backgroundDark
+-                        : colors.backgroundLight,
+-                    width: 3,
+-                    height: '100%',
+-                    borderRadius: 12,
+-                    marginRight: 12,
+-                  },
+-                  defaultStyle?.indicator,
+-                  toast?.styles?.indicator,
+-                ]}
+-              />
+-            )}
+-            {typeof toast.icon === 'string' ? (
+-              <Text>{toast.icon}</Text>
+-            ) : (
+-              toast.icon
+-            )}
+-            <Text
+-              style={[
+-                {
+-                  color: isDarkMode ? colors.textLight : colors.textDark,
+-                  padding: 4,
+-                  flex: 1,
+-                },
+-                defaultStyle?.text,
+-                toast?.styles?.text,
+-              ]}
++           {!!toast?.image && <Image
++              source={toast.image}
++              style={{
++                marginLeft: 20,
++               
++              }}
++            />}
++            <View
++              style={{
++                flex: 1
++              }}
+             >
+-              {resolveValue(toast.message, toast)}
+-            </Text>
++              <Text
++                style={{
++                  color: 'black',
++
++                  flex: 1,
++                  fontWeight: 'bold',
++                  fontSize: 18
++                }}
++              >
++                {resolveValue(toast.title, toast)}
++              </Text>
++              <Text
++                style={{
++                  color: 'black',
++                  padding: 4,
++                  flex: 1
++                }}
++              >
++                {resolveValue(toast.message, toast)}
++              </Text>
++              {!!toast?.btnTitle && (
++                <TouchableOpacity onPress={() => toast?.onPressButton?.()}>
++                  <Text
++                    style={{
++                      color: '#FF8C53',
++                      padding: 4,
++                      flex: 1,
++                      fontWeight: 'bold',
++                      fontSize: 18,
++                      textTransform: 'capitalize'
++                    }}
++                  >
++                    {toast.btnTitle}
++                  </Text>
++                </TouchableOpacity>
++              )}
++            </View>
+           </View>
+         )}
++        {(toast.type === 'error' || toast.type === 'success') && (
++          <View
++            style={[
++              // eslint-disable-next-line react-native/no-inline-styles
++              {
++                backgroundColor:
++                  toast.type === 'error'
++                    ? colors.error
++                    : toast.type === 'success'
++                      ? colors.success
++                      : colors.backgroundLight,
++                width: 10,
++                height: '100%',
++
++                marginRight: 12,
++                position: 'absolute',
++                left: 0
++              },
++              defaultStyle?.indicator,
++              toast?.styles?.indicator
++            ]}
++          />
++        )}
+       </AnimatedPressable>
+     </GestureDetector>
+-  );
+-};
++  )
++}
+diff --git a/node_modules/@backpackapp-io/react-native-toast/src/components/Toasts.tsx b/node_modules/@backpackapp-io/react-native-toast/src/components/Toasts.tsx
+index 2e214ca..5b4754f 100644
+--- a/node_modules/@backpackapp-io/react-native-toast/src/components/Toasts.tsx
++++ b/node_modules/@backpackapp-io/react-native-toast/src/components/Toasts.tsx
+@@ -1,47 +1,40 @@
+-import React, { FunctionComponent } from 'react';
+-import { TextStyle, View, ViewStyle } from 'react-native';
++import React, {FunctionComponent} from 'react'
++import {TextStyle, View, ViewStyle} from 'react-native'
++import {useSafeAreaInsets} from 'react-native-safe-area-context'
+ 
+-import { Toast as T, useToaster } from '../headless';
+-import { Toast } from './Toast';
+-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+-import { ExtraInsets } from '../core/types';
++import {ExtraInsets} from '../core/types'
++import {useToaster} from '../headless'
++import {Toast} from './Toast'
+ 
+ type Props = {
+-  overrideDarkMode?: boolean;
+-  extraInsets?: ExtraInsets;
+-  onToastShow?: (toast: T) => void;
+-  onToastHide?: (toast: T) => void;
+-  onToastPress?: (toast: T) => void;
+-  providerKey?: string;
++  extraInsets?: ExtraInsets
++  providerKey?: string
+   defaultStyle?: {
+-    pressable?: ViewStyle;
+-    view?: ViewStyle;
+-    text?: TextStyle;
+-    indicator?: ViewStyle;
+-  };
+-};
++    pressable?: ViewStyle
++    view?: ViewStyle
++    text?: TextStyle
++    indicator?: ViewStyle
++  }
++}
+ 
+ export const Toasts: FunctionComponent<Props> = ({
+-  overrideDarkMode,
+   extraInsets,
+-  onToastHide,
+-  onToastPress,
+-  onToastShow,
+   providerKey = 'DEFAULT',
+-  defaultStyle,
++  defaultStyle
+ }) => {
+-  const { toasts, handlers } = useToaster({ providerKey });
+-  const { startPause, endPause } = handlers;
+-  const insets = useSafeAreaInsets();
++  const {toasts, handlers} = useToaster({providerKey})
++  const {startPause, endPause} = handlers
++  const insets = useSafeAreaInsets()
+ 
+   return (
+     <View
++      // eslint-disable-next-line react-native/no-inline-styles
+       style={{
+         position: 'absolute',
+         top: insets.top + (extraInsets?.top ?? 0) + 16,
+         left: insets.left + (extraInsets?.left ?? 0),
+         right: insets.right + (extraInsets?.right ?? 0),
+-        bottom: insets.bottom + (extraInsets?.bottom ?? 0) + 16,
++        bottom: insets.bottom + (extraInsets?.bottom ?? 0) + 16
+       }}
+       pointerEvents={'box-none'}
+     >
+@@ -53,16 +46,12 @@ export const Toasts: FunctionComponent<Props> = ({
+           endPause={endPause}
+           updateHeight={handlers.updateHeight}
+           offset={handlers.calculateOffset(t, {
+-            reverseOrder: true,
++            reverseOrder: true
+           })}
+-          overrideDarkMode={overrideDarkMode}
+-          onToastHide={onToastHide}
+-          onToastPress={onToastPress}
+-          onToastShow={onToastShow}
+           extraInsets={extraInsets}
+           defaultStyle={defaultStyle}
+         />
+       ))}
+     </View>
+-  );
+-};
++  )
++}
+diff --git a/node_modules/@backpackapp-io/react-native-toast/src/components/index.ts b/node_modules/@backpackapp-io/react-native-toast/src/components/index.ts
+index debc025..abe4115 100644
+--- a/node_modules/@backpackapp-io/react-native-toast/src/components/index.ts
++++ b/node_modules/@backpackapp-io/react-native-toast/src/components/index.ts
+@@ -1 +1 @@
+-export * from './Toasts';
++export * from './Toasts'
+diff --git a/node_modules/@backpackapp-io/react-native-toast/src/core/store.ts b/node_modules/@backpackapp-io/react-native-toast/src/core/store.ts
+index 79b9f7b..20e059b 100644
+--- a/node_modules/@backpackapp-io/react-native-toast/src/core/store.ts
++++ b/node_modules/@backpackapp-io/react-native-toast/src/core/store.ts
+@@ -1,7 +1,8 @@
+-import { useEffect, useState } from 'react';
+-import type { DefaultToastOptions, Toast, ToastType } from './types';
++import {useEffect, useState} from 'react'
+ 
+-const TOAST_LIMIT = 20;
++import type {DefaultToastOptions, Toast, ToastType} from './types'
++
++const TOAST_LIMIT = 20
+ 
+ export enum ActionType {
+   ADD_TOAST,
+@@ -10,106 +11,106 @@ export enum ActionType {
+   DISMISS_TOAST,
+   REMOVE_TOAST,
+   START_PAUSE,
+-  END_PAUSE,
++  END_PAUSE
+ }
+ 
+ type Action =
+   | {
+-      type: ActionType.ADD_TOAST;
+-      toast: Toast;
++      type: ActionType.ADD_TOAST
++      toast: Toast
+     }
+   | {
+-      type: ActionType.UPSERT_TOAST;
+-      toast: Toast;
++      type: ActionType.UPSERT_TOAST
++      toast: Toast
+     }
+   | {
+-      type: ActionType.UPDATE_TOAST;
+-      toast: Partial<Toast>;
++      type: ActionType.UPDATE_TOAST
++      toast: Partial<Toast>
+     }
+   | {
+-      type: ActionType.DISMISS_TOAST;
+-      toastId?: string;
++      type: ActionType.DISMISS_TOAST
++      toastId?: string
+     }
+   | {
+-      type: ActionType.REMOVE_TOAST;
+-      toastId?: string;
++      type: ActionType.REMOVE_TOAST
++      toastId?: string
+     }
+   | {
+-      type: ActionType.START_PAUSE;
+-      time: number;
++      type: ActionType.START_PAUSE
++      time: number
+     }
+   | {
+-      type: ActionType.END_PAUSE;
+-      time: number;
+-    };
++      type: ActionType.END_PAUSE
++      time: number
++    }
+ 
+ interface State {
+-  toasts: Toast[];
+-  pausedAt: number | undefined;
++  toasts: Toast[]
++  pausedAt: number | undefined
+ }
+ 
+-const toastTimeouts = new Map<Toast['id'], ReturnType<typeof setTimeout>>();
++const toastTimeouts = new Map<Toast['id'], ReturnType<typeof setTimeout>>()
+ 
+ const addToRemoveQueue = (toastId: string) => {
+   if (toastTimeouts.has(toastId)) {
+-    return;
++    return
+   }
+ 
+   const timeout = setTimeout(() => {
+-    toastTimeouts.delete(toastId);
++    toastTimeouts.delete(toastId)
+     dispatch({
+       type: ActionType.REMOVE_TOAST,
+-      toastId: toastId,
+-    });
+-  }, 1000);
++      toastId
++    })
++  }, 1000)
+ 
+-  toastTimeouts.set(toastId, timeout);
+-};
++  toastTimeouts.set(toastId, timeout)
++}
+ 
+ const clearFromRemoveQueue = (toastId: string) => {
+-  const timeout = toastTimeouts.get(toastId);
++  const timeout = toastTimeouts.get(toastId)
+   if (timeout) {
+-    clearTimeout(timeout);
++    clearTimeout(timeout)
+   }
+-};
++}
+ 
+ export const reducer = (state: State, action: Action): State => {
+   switch (action.type) {
+     case ActionType.ADD_TOAST:
+       return {
+         ...state,
+-        toasts: [action.toast, ...state.toasts].slice(0, TOAST_LIMIT),
+-      };
++        toasts: [action.toast, ...state.toasts].slice(0, TOAST_LIMIT)
++      }
+ 
+     case ActionType.UPDATE_TOAST:
+       //  ! Side effects !
+       if (action.toast.id) {
+-        clearFromRemoveQueue(action.toast.id);
++        clearFromRemoveQueue(action.toast.id)
+       }
+ 
+       return {
+         ...state,
+-        toasts: state.toasts.map((t) =>
+-          t.id === action.toast.id ? { ...t, ...action.toast } : t
+-        ),
+-      };
++        toasts: state.toasts.map((t) => (t.id === action.toast.id ? {...t, ...action.toast} : t))
++      }
+ 
+     case ActionType.UPSERT_TOAST:
+-      const { toast } = action;
++      // eslint-disable-next-line no-case-declarations
++      const {toast} = action
+       return state.toasts.find((t) => t.id === toast.id)
+-        ? reducer(state, { type: ActionType.UPDATE_TOAST, toast })
+-        : reducer(state, { type: ActionType.ADD_TOAST, toast });
++        ? reducer(state, {type: ActionType.UPDATE_TOAST, toast})
++        : reducer(state, {type: ActionType.ADD_TOAST, toast})
+ 
+     case ActionType.DISMISS_TOAST:
+-      const { toastId } = action;
++      // eslint-disable-next-line no-case-declarations
++      const {toastId} = action
+ 
+       // ! Side effects ! - This could be execrated into a dismissToast() action, but I'll keep it here for simplicity
+       if (toastId) {
+-        addToRemoveQueue(toastId);
++        addToRemoveQueue(toastId)
+       } else {
+         state.toasts.forEach((toast) => {
+-          addToRemoveQueue(toast.id);
+-        });
++          addToRemoveQueue(toast.id)
++        })
+       }
+ 
+       return {
+@@ -118,74 +119,74 @@ export const reducer = (state: State, action: Action): State => {
+           t.id === toastId || toastId === undefined
+             ? {
+                 ...t,
+-                visible: false,
++                visible: false
+               }
+             : t
+-        ),
+-      };
++        )
++      }
+     case ActionType.REMOVE_TOAST:
+       if (action.toastId === undefined) {
+         return {
+           ...state,
+-          toasts: [],
+-        };
++          toasts: []
++        }
+       }
+       return {
+         ...state,
+-        toasts: state.toasts.filter((t) => t.id !== action.toastId),
+-      };
++        toasts: state.toasts.filter((t) => t.id !== action.toastId)
++      }
+ 
+     case ActionType.START_PAUSE:
+       return {
+         ...state,
+-        pausedAt: action.time,
+-      };
++        pausedAt: action.time
++      }
+ 
+     case ActionType.END_PAUSE:
+-      const diff = action.time - (state.pausedAt || 0);
++      // eslint-disable-next-line no-case-declarations
++      const diff = action.time - (state.pausedAt || 0)
+ 
+       return {
+         ...state,
+         pausedAt: undefined,
+         toasts: state.toasts.map((t) => ({
+           ...t,
+-          pauseDuration: t.pauseDuration + diff,
+-        })),
+-      };
++          pauseDuration: t.pauseDuration + diff
++        }))
++      }
+   }
+-};
++}
+ 
+-const listeners: Array<(state: State) => void> = [];
++const listeners: Array<(state: State) => void> = []
+ 
+-let memoryState: State = { toasts: [], pausedAt: undefined };
++let memoryState: State = {toasts: [], pausedAt: undefined}
+ 
+ export const dispatch = (action: Action) => {
+-  memoryState = reducer(memoryState, action);
++  memoryState = reducer(memoryState, action)
+   listeners.forEach((listener) => {
+-    listener(memoryState);
+-  });
+-};
++    listener(memoryState)
++  })
++}
+ 
+ const defaultTimeouts: {
+-  [key in ToastType]: number;
++  [key in ToastType]: number
+ } = {
+   blank: 4000,
+   error: 4000,
+-  success: 2000,
+-  loading: Infinity,
+-};
++  success: 2000
++}
+ 
+ export const useStore = (toastOptions: DefaultToastOptions = {}): State => {
+-  const [state, setState] = useState<State>(memoryState);
++  const [state, setState] = useState<State>(memoryState)
+   useEffect(() => {
+-    listeners.push(setState);
++    listeners.push(setState)
+     return () => {
+-      const index = listeners.indexOf(setState);
++      const index = listeners.indexOf(setState)
+       if (index > -1) {
+-        listeners.splice(index, 1);
++        listeners.splice(index, 1)
+       }
+-    };
+-  }, [state]);
++    }
++  }, [state])
+ 
+   const mergedToasts = state.toasts
+     .filter(
+@@ -204,12 +205,12 @@ export const useStore = (toastOptions: DefaultToastOptions = {}): State => {
+         toastOptions?.duration ||
+         defaultTimeouts[t.type],
+       styles: {
+-        ...(t?.styles ?? {}),
+-      },
+-    }));
++        ...(t?.styles ?? {})
++      }
++    }))
+ 
+   return {
+     ...state,
+-    toasts: mergedToasts,
+-  };
+-};
++    toasts: mergedToasts
++  }
++}
+diff --git a/node_modules/@backpackapp-io/react-native-toast/src/core/toast.ts b/node_modules/@backpackapp-io/react-native-toast/src/core/toast.ts
+index db5b745..dd215f6 100644
+--- a/node_modules/@backpackapp-io/react-native-toast/src/core/toast.ts
++++ b/node_modules/@backpackapp-io/react-native-toast/src/core/toast.ts
+@@ -1,3 +1,4 @@
++import {ActionType, dispatch} from './store'
+ import {
+   DefaultToastOptions,
+   Element,
+@@ -6,17 +7,17 @@ import {
+   ToastOptions,
+   ToastPosition,
+   ToastType,
+-  ValueOrFunction,
+-} from './types';
+-import { genId } from './utils';
+-import { ActionType, dispatch } from './store';
++  ValueOrFunction
++} from './types'
++import {genId} from './utils'
+ 
+-type Message = ValueOrFunction<Element, Toast>;
++type Message = ValueOrFunction<Element, Toast>
+ 
+-type ToastHandler = (message: Message, options?: ToastOptions) => string;
++type ToastHandler = (message: Message, title: string, options?: ToastOptions) => string
+ 
+ const createToast = (
+   message: Message,
++  title: string,
+   type: ToastType = 'blank',
+   opts?: ToastOptions
+ ): Toast => ({
+@@ -24,68 +25,63 @@ const createToast = (
+   visible: true,
+   type,
+   message,
++  title,
+   pauseDuration: 0,
+   position: ToastPosition.TOP,
+   providerKey: 'DEFAULT',
+   isSwipeable: true,
+   ...opts,
+-  id: opts?.id || genId(),
+-});
++  id: opts?.id || genId()
++})
+ 
+ const createHandler =
+   (type?: ToastType): ToastHandler =>
+-  (message, options) => {
+-    const toast = createToast(message, type, options);
+-    dispatch({ type: ActionType.UPSERT_TOAST, toast });
+-    return toast.id;
+-  };
++  (message, title: string, options) => {
++    const toast = createToast(message, title, type, options)
++    dispatch({type: ActionType.UPSERT_TOAST, toast})
++    return toast.id
++  }
+ 
+-const toast = (message: Message, opts?: ToastOptions) =>
+-  createHandler('blank')(message, opts);
++const toast = (message: Message, title: string, opts?: ToastOptions) =>
++  createHandler('blank')(message, title, opts)
+ 
+-toast.error = createHandler('error');
+-toast.success = createHandler('success');
+-toast.loading = createHandler('loading');
++toast.error = createHandler('error')
++toast.success = createHandler('success')
+ 
+ toast.dismiss = (toastId?: string) => {
+   dispatch({
+     type: ActionType.DISMISS_TOAST,
+-    toastId,
+-  });
+-};
++    toastId
++  })
++}
+ 
+-toast.remove = (toastId?: string) =>
+-  dispatch({ type: ActionType.REMOVE_TOAST, toastId });
++toast.remove = (toastId?: string) => dispatch({type: ActionType.REMOVE_TOAST, toastId})
+ 
+ toast.promise = <T>(
+   promise: Promise<T>,
+   msgs: {
+-    loading: Element;
+-    success: ValueOrFunction<Element, T>;
+-    error: ValueOrFunction<Element, any>;
++    success: ValueOrFunction<Element, T>
++    error: ValueOrFunction<Element, any>
+   },
++  title: string,
+   opts?: DefaultToastOptions
+ ) => {
+-  const id = toast.loading(msgs.loading, { ...opts, ...opts?.loading });
+-
+   promise
+     .then((p) => {
+-      toast.success(resolveValue(msgs.success, p), {
+-        id,
++      toast.success(resolveValue(msgs.success, p), title, {
+         ...opts,
+-        ...opts?.success,
+-      });
+-      return p;
++        ...opts?.success
++      })
++      return p
+     })
+     .catch((e) => {
+-      toast.error(resolveValue(msgs.error, e), {
+-        id,
++      toast.error(resolveValue(msgs.error, e), title, {
+         ...opts,
+-        ...opts?.error,
+-      });
+-    });
++        ...opts?.error
++      })
++    })
+ 
+-  return promise;
+-};
++  return promise
++}
+ 
+-export { toast };
++export {toast}
+diff --git a/node_modules/@backpackapp-io/react-native-toast/src/core/types.ts b/node_modules/@backpackapp-io/react-native-toast/src/core/types.ts
+index fb57d6c..7e637b3 100644
+--- a/node_modules/@backpackapp-io/react-native-toast/src/core/types.ts
++++ b/node_modules/@backpackapp-io/react-native-toast/src/core/types.ts
+@@ -1,60 +1,61 @@
+-import type { TextStyle, ViewStyle } from 'react-native';
++import type {ImageSourcePropType, TextStyle, ViewStyle} from 'react-native'
+ 
+-export type ToastType = 'success' | 'error' | 'loading' | 'blank';
++export type ToastType = 'success' | 'error' | 'blank'
+ export enum ToastPosition {
+   TOP = 1,
+-  BOTTOM = 2,
++  BOTTOM = 2
+ }
+ 
+-export type Element = JSX.Element | string | null;
++export type Element = JSX.Element | string | null
+ 
+ export interface IconTheme {
+-  primary: string;
+-  secondary: string;
++  primary: string
++  secondary: string
+ }
+ 
+-export type ValueFunction<TValue, TArg> = (arg: TArg) => TValue;
+-export type ValueOrFunction<TValue, TArg> =
+-  | TValue
+-  | ValueFunction<TValue, TArg>;
++export type ValueFunction<TValue, TArg> = (arg: TArg) => TValue
++export type ValueOrFunction<TValue, TArg> = TValue | ValueFunction<TValue, TArg>
+ 
+ const isFunction = <TValue, TArg>(
+   valOrFunction: ValueOrFunction<TValue, TArg>
+-): valOrFunction is ValueFunction<TValue, TArg> =>
+-  typeof valOrFunction === 'function';
++): valOrFunction is ValueFunction<TValue, TArg> => typeof valOrFunction === 'function'
+ 
+ export const resolveValue = <TValue, TArg>(
+   valOrFunction: ValueOrFunction<TValue, TArg>,
+   arg: TArg
+-): TValue => (isFunction(valOrFunction) ? valOrFunction(arg) : valOrFunction);
++): TValue => (isFunction(valOrFunction) ? valOrFunction(arg) : valOrFunction)
+ 
+ export interface Toast {
+-  type: ToastType;
+-  id: string;
+-  message: ValueOrFunction<Element, Toast>;
+-  icon?: Element;
+-  duration?: number;
+-  pauseDuration: number;
+-  position?: ToastPosition;
+-  disableShadow?: boolean;
+-  createdAt: number;
+-  visible: boolean;
+-  height?: number;
+-  width?: number;
++  type: ToastType
++  id: string
++  title: ValueOrFunction<Element, Toast>
++  message: ValueOrFunction<Element, Toast>
++  icon?: Element
++  duration?: number
++  pauseDuration: number
++  position?: ToastPosition
++  disableShadow?: boolean
++  createdAt: number
++  visible: boolean
++  height?: number
++  width?: number
+   styles?: {
+-    pressable?: ViewStyle;
+-    view?: ViewStyle;
+-    text?: TextStyle;
+-    indicator?: ViewStyle;
+-  };
+-  customToast?: (toast: Toast) => JSX.Element;
+-  providerKey: string;
+-  isSwipeable?: boolean;
++    pressable?: ViewStyle
++    view?: ViewStyle
++    text?: TextStyle
++    indicator?: ViewStyle
++  }
++  image:ImageSourcePropType
++  customToast?: (toast: Toast) => JSX.Element
++  providerKey: string
++  isSwipeable?: boolean
++  onPressButton?: () => void
++  btnTitle?: string
+   animationConfig?: {
+-    flingPositionReturnDuration?: number;
+-    animationStiffness?: number;
+-    animationDuration?: number;
+-  };
++    flingPositionReturnDuration?: number
++    animationStiffness?: number
++    animationDuration?: number
++  }
+ }
+ 
+ export type ToastOptions = Partial<
+@@ -72,26 +73,28 @@ export type ToastOptions = Partial<
+     | 'providerKey'
+     | 'isSwipeable'
+     | 'animationConfig'
++    | 'onPressButton'
++    | 'btnTitle'|"image"
+   >
+->;
++>
+ 
+ export type DefaultToastOptions = ToastOptions & {
+-  [key in ToastType]?: ToastOptions;
+-};
++  [key in ToastType]?: ToastOptions
++}
+ 
+ export interface ToasterProps {
+-  position?: ToastPosition;
+-  toastOptions?: DefaultToastOptions;
+-  reverseOrder?: boolean;
+-  gutter?: number;
+-  containerStyle?: React.CSSProperties;
+-  containerClassName?: string;
+-  children?: (toast: Toast) => JSX.Element;
++  position?: ToastPosition
++  toastOptions?: DefaultToastOptions
++  reverseOrder?: boolean
++  gutter?: number
++  containerStyle?: React.CSSProperties
++  containerClassName?: string
++  children?: (toast: Toast) => JSX.Element
+ }
+ 
+ export type ExtraInsets = {
+-  top?: number;
+-  bottom?: number;
+-  right?: number;
+-  left?: number;
+-};
++  top?: number
++  bottom?: number
++  right?: number
++  left?: number
++}
+diff --git a/node_modules/@backpackapp-io/react-native-toast/src/core/use-toaster.ts b/node_modules/@backpackapp-io/react-native-toast/src/core/use-toaster.ts
+index 2795eff..3a8a9a2 100644
+--- a/node_modules/@backpackapp-io/react-native-toast/src/core/use-toaster.ts
++++ b/node_modules/@backpackapp-io/react-native-toast/src/core/use-toaster.ts
+@@ -1,56 +1,57 @@
+-import { useEffect, useMemo } from 'react';
+-import { ActionType, dispatch, useStore } from './store';
+-import { toast } from './toast';
+-import type { DefaultToastOptions, Toast, ToastPosition } from './types';
++import { useEffect, useMemo } from 'react'
++
++import { ActionType, dispatch, useStore } from './store'
++import { toast } from './toast'
++import type { DefaultToastOptions, Toast, ToastPosition } from './types'
+ 
+ export const useToaster = (toastOptions?: DefaultToastOptions) => {
+-  const { toasts, pausedAt } = useStore(toastOptions);
++  const { toasts, pausedAt } = useStore(toastOptions)
+ 
+   useEffect(() => {
+     if (pausedAt) {
+-      return;
++      return
+     }
+ 
+-    const now = Date.now();
++    const now = Date.now()
+     const timeouts = toasts.map((t) => {
+       if (t.duration === Infinity) {
+-        return;
++        return
+       }
+ 
+       const durationLeft =
+-        (t.duration || 0) + t.pauseDuration - (now - t.createdAt);
++        (t.duration || 0) + t.pauseDuration - (now - t.createdAt)
+ 
+       if (durationLeft < 0) {
+         if (t.visible) {
+-          toast.dismiss(t.id);
++          toast.dismiss(t.id)
+         }
+-        return;
++        return
+       }
+-      return setTimeout(() => toast.dismiss(t.id), durationLeft);
+-    });
++      return setTimeout(() => toast.dismiss(t.id), durationLeft)
++    })
+ 
+     return () => {
+-      timeouts.forEach((timeout) => timeout && clearTimeout(timeout));
+-    };
+-  }, [toasts, pausedAt]);
++      timeouts.forEach((timeout) => timeout && clearTimeout(timeout))
++    }
++  }, [toasts, pausedAt])
+ 
+   const handlers = useMemo(
+     () => ({
+       startPause: () => {
+         dispatch({
+           type: ActionType.START_PAUSE,
+-          time: Date.now(),
+-        });
++          time: Date.now()
++        })
+       },
+       endPause: () => {
+         if (pausedAt) {
+-          dispatch({ type: ActionType.END_PAUSE, time: Date.now() });
++          dispatch({ type: ActionType.END_PAUSE, time: Date.now() })
+         }
+       },
+       updateHeight: (toastId: string, height: number) =>
+         dispatch({
+           type: ActionType.UPDATE_TOAST,
+-          toast: { id: toastId, height },
++          toast: { id: toastId, height }
+         }),
+       calculateOffset: (
+         toast: Toast,
+@@ -63,30 +64,30 @@ export const useToaster = (toastOptions?: DefaultToastOptions) => {
+         const {
+           reverseOrder = false,
+           gutter = 8,
+-          defaultPosition,
+-        } = opts || {};
++          defaultPosition
++        } = opts || {}
+ 
+         const relevantToasts = toasts.filter(
+           (t) =>
+             (t.position || defaultPosition) ===
+               (toast.position || defaultPosition) && t.height
+-        );
+-        const toastIndex = relevantToasts.findIndex((t) => t.id === toast.id);
++        )
++        const toastIndex = relevantToasts.findIndex((t) => t.id === toast.id)
+         const toastsBefore = relevantToasts.filter(
+           (toast, i) => i < toastIndex && toast.visible
+-        ).length;
++        ).length
+ 
+         return relevantToasts
+           .filter((t) => t.visible)
+           .slice(...(reverseOrder ? [toastsBefore + 1] : [0, toastsBefore]))
+-          .reduce((acc, t) => acc + (t.height || 0) + gutter, 0);
+-      },
++          .reduce((acc, t) => acc + (t.height || 0) + gutter, 0)
++      }
+     }),
+     [toasts, pausedAt]
+-  );
++  )
+ 
+   return {
+     toasts,
+-    handlers,
+-  };
+-};
++    handlers
++  }
++}
+diff --git a/node_modules/@backpackapp-io/react-native-toast/src/core/utils.ts b/node_modules/@backpackapp-io/react-native-toast/src/core/utils.ts
+index fdaca37..c5f3fcf 100644
+--- a/node_modules/@backpackapp-io/react-native-toast/src/core/utils.ts
++++ b/node_modules/@backpackapp-io/react-native-toast/src/core/utils.ts
+@@ -1,6 +1,6 @@
+ export const genId = (() => {
+-  let count = 0;
++  let count = 0
+   return () => {
+-    return (++count).toString();
+-  };
+-})();
++    return (++count).toString()
++  }
++})()
+diff --git a/node_modules/@backpackapp-io/react-native-toast/src/headless/index.ts b/node_modules/@backpackapp-io/react-native-toast/src/headless/index.ts
+index d79c3d5..13428ad 100644
+--- a/node_modules/@backpackapp-io/react-native-toast/src/headless/index.ts
++++ b/node_modules/@backpackapp-io/react-native-toast/src/headless/index.ts
+@@ -1,20 +1,19 @@
+-import { toast } from '../core/toast';
++import { toast } from '../core/toast'
+ 
++export { useStore as useToasterStore } from '../core/store'
+ export type {
+   DefaultToastOptions,
+-  IconTheme,
+   Element,
++  IconTheme,
+   Toast,
+   ToasterProps,
+   ToastOptions,
+   ToastType,
+   ValueFunction,
+-  ValueOrFunction,
+-} from '../core/types';
+-
+-export { resolveValue } from '../core/types';
+-export { useToaster } from '../core/use-toaster';
+-export { useStore as useToasterStore } from '../core/store';
++  ValueOrFunction
++} from '../core/types'
++export { resolveValue } from '../core/types'
++export { useToaster } from '../core/use-toaster'
+ 
+-export { toast };
+-export default toast;
++export { toast }
++export default toast
+diff --git a/node_modules/@backpackapp-io/react-native-toast/src/index.tsx b/node_modules/@backpackapp-io/react-native-toast/src/index.tsx
+index cc5b159..36e9ae5 100644
+--- a/node_modules/@backpackapp-io/react-native-toast/src/index.tsx
++++ b/node_modules/@backpackapp-io/react-native-toast/src/index.tsx
+@@ -1,4 +1,4 @@
+-export { useToaster } from './core/use-toaster';
+-export { Toasts } from './components';
+-export * from './headless';
+-export { ToastPosition } from './core/types';
++export { Toasts } from './components'
++export { ToastPosition } from './core/types'
++export { useToaster } from './core/use-toaster'
++export * from './headless'
+diff --git a/node_modules/@backpackapp-io/react-native-toast/src/utils/index.ts b/node_modules/@backpackapp-io/react-native-toast/src/utils/index.ts
+index 1de1564..552b858 100644
+--- a/node_modules/@backpackapp-io/react-native-toast/src/utils/index.ts
++++ b/node_modules/@backpackapp-io/react-native-toast/src/utils/index.ts
+@@ -1,3 +1,3 @@
+-export * from './useKeyboard';
+-export * from './styles';
+-export * from './useVisibilityChange';
++export * from './styles'
++export * from './useKeyboard'
++export * from './useVisibilityChange'
+diff --git a/node_modules/@backpackapp-io/react-native-toast/src/utils/styles.ts b/node_modules/@backpackapp-io/react-native-toast/src/utils/styles.ts
+index 957c8a3..60d1a6f 100644
+--- a/node_modules/@backpackapp-io/react-native-toast/src/utils/styles.ts
++++ b/node_modules/@backpackapp-io/react-native-toast/src/utils/styles.ts
+@@ -1,4 +1,4 @@
+-import type { ViewStyle } from 'react-native';
++import type { ViewStyle } from 'react-native'
+ 
+ /**
+  * Construct a shadow object given a color and opacity
+@@ -18,23 +18,23 @@ export const ConstructShadow = (
+     shadowColor: color ?? '#000',
+     shadowOffset: {
+       width: 0,
+-      height: (floatBelow ? -1 : 1) * (enlargeShadow ? 8 : 3),
++      height: (floatBelow ? -1 : 1) * (enlargeShadow ? 8 : 3)
+     },
+     shadowOpacity: opacity ?? 0.18,
+     shadowRadius: enlargeShadow ? 6 : 4.65,
+ 
+-    elevation: isImage ? undefined : 7,
+-  };
+-};
++    elevation: isImage ? undefined : 7
++  }
++}
+ 
+ export const colors = {
+-  primary: '#1B71FC',
++  primary: '#FF8C53',
+   backgroundLight: '#212331',
+   backgroundDark: '#f7f7f7',
+-  success: '#0BAA83',
++  success: '#FF8C53',
+   error: '#fe352a',
+   info: '#74B9FF',
+   textLight: '#52616B',
+   textDark: '#f2f2f2',
+-  label: '#9daec9',
+-};
++  label: '#9daec9'
++}
+diff --git a/node_modules/@backpackapp-io/react-native-toast/src/utils/useKeyboard.ts b/node_modules/@backpackapp-io/react-native-toast/src/utils/useKeyboard.ts
+index e2697e0..9efd0b0 100644
+--- a/node_modules/@backpackapp-io/react-native-toast/src/utils/useKeyboard.ts
++++ b/node_modules/@backpackapp-io/react-native-toast/src/utils/useKeyboard.ts
+@@ -1,5 +1,5 @@
+-import { useEffect, useState } from 'react';
+-import { Keyboard, KeyboardEventListener, KeyboardMetrics } from 'react-native';
++import { useEffect, useState } from 'react'
++import { Keyboard, KeyboardEventListener, KeyboardMetrics } from 'react-native'
+ 
+ /**
+  * Get keyboard status, height, and coordinates
+@@ -8,52 +8,52 @@ const emptyCoordinates = Object.freeze({
+   screenX: 0,
+   screenY: 0,
+   width: 0,
+-  height: 0,
+-});
++  height: 0
++})
+ const initialValue = {
+   start: emptyCoordinates,
+-  end: emptyCoordinates,
+-};
++  end: emptyCoordinates
++}
+ 
+ export function useKeyboard() {
+-  const [shown, setShown] = useState(false);
++  const [shown, setShown] = useState(false)
+   const [coordinates, setCoordinates] = useState<{
+     start: undefined | KeyboardMetrics;
+     end: KeyboardMetrics;
+-  }>(initialValue);
+-  const [keyboardHeight, setKeyboardHeight] = useState<number>(0);
++  }>(initialValue)
++  const [keyboardHeight, setKeyboardHeight] = useState<number>(0)
+ 
+   const handleKeyboardDidShow: KeyboardEventListener = (e) => {
+-    setShown(true);
+-    setCoordinates({ start: e.startCoordinates, end: e.endCoordinates });
+-    setKeyboardHeight(e.endCoordinates.height);
+-  };
++    setShown(true)
++    setCoordinates({ start: e.startCoordinates, end: e.endCoordinates })
++    setKeyboardHeight(e.endCoordinates.height)
++  }
+ 
+   const handleKeyboardDidHide: KeyboardEventListener = (e) => {
+-    setShown(false);
++    setShown(false)
+     if (e) {
+-      setCoordinates({ start: e.startCoordinates, end: e.endCoordinates });
++      setCoordinates({ start: e.startCoordinates, end: e.endCoordinates })
+     } else {
+-      setCoordinates(initialValue);
+-      setKeyboardHeight(0);
++      setCoordinates(initialValue)
++      setKeyboardHeight(0)
+     }
+-  };
++  }
+ 
+   useEffect(() => {
+     const subscriptions = [
+       Keyboard.addListener('keyboardWillShow', handleKeyboardDidShow),
+       Keyboard.addListener('keyboardDidShow', handleKeyboardDidShow),
+       Keyboard.addListener('keyboardWillHide', handleKeyboardDidHide),
+-      Keyboard.addListener('keyboardDidHide', handleKeyboardDidHide),
+-    ];
++      Keyboard.addListener('keyboardDidHide', handleKeyboardDidHide)
++    ]
+ 
+     return () => {
+-      subscriptions.forEach((subscription) => subscription.remove());
+-    };
+-  }, []);
++      subscriptions.forEach((subscription) => subscription.remove())
++    }
++  }, [])
+   return {
+     keyboardShown: shown,
+     coordinates,
+-    keyboardHeight,
+-  };
++    keyboardHeight
++  }
+ }
+diff --git a/node_modules/@backpackapp-io/react-native-toast/src/utils/useVisibilityChange.ts b/node_modules/@backpackapp-io/react-native-toast/src/utils/useVisibilityChange.ts
+index cb6c985..6e256c3 100644
+--- a/node_modules/@backpackapp-io/react-native-toast/src/utils/useVisibilityChange.ts
++++ b/node_modules/@backpackapp-io/react-native-toast/src/utils/useVisibilityChange.ts
+@@ -1,23 +1,23 @@
+-import { useEffect, useState } from 'react';
++import { useEffect, useState } from 'react'
+ 
+ export const useVisibilityChange = (
+   onShow: () => void,
+   onHide: () => void,
+   visible: boolean
+ ) => {
+-  const [mounted, setMounted] = useState(false);
++  const [mounted, setMounted] = useState(false)
+ 
+   useEffect(() => {
+     if (!mounted && visible) {
+-      setMounted(true);
+-      onShow();
++      setMounted(true)
++      onShow()
+     }
+ 
+     if (mounted && !visible) {
+-      setMounted(false);
+-      onHide();
++      setMounted(false)
++      onHide()
+     }
+-  }, [visible, mounted, onShow, onHide]);
++  }, [visible, mounted, onShow, onHide])
+ 
+-  return undefined;
+-};
++  return undefined
++}

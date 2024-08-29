@@ -1,0 +1,33 @@
+const Colors = {
+  transparent: 'transparent',
+  themeColor: '#FF8C53',
+  themeColor30: 'rgba(255, 140, 83,0.3)',
+  white: '#FFFFFF',
+  white20: 'rgba(255, 255, 255, 0.7)',
+  black: '#000000',
+  black37: '#0000005E',
+  blackColor30: 'rgba(0, 0, 0, 0.3)',
+  orangeColorFF: '#FFF0E9',
+  borderColor: '#CFCFCF',
+  borderColor30: 'rgba(207, 207, 207,0.5)',
+  borderColor10: 'rgba(207, 207, 207,0.1)',
+  shadowColor: 'rgba(122, 122, 122,0.8)',
+  buttonBackGround: '#101626',
+  disableColor: '#E5E5E5',
+  disabledText: '#ABABAB',
+  outLineHover: '#F9F9F9',
+  greyShade595: '#595E69',
+  redShadeD3: '#FF0000',
+  greyShadeA0: '#A0A3A9',
+  subTextColor: '#4E4E4E',
+  menuBackground: '#F2F2F7',
+  themeSecondary: '#FF8041',
+  greyShade7878: '#787880',
+  grey8a8a8a: '#8a8a8e',
+  orangeLightFE: '#fef4ee',
+  blackShade0F: '#0f1626',
+  greyShadeFBFB: '#fbfbfb',
+  orangeShadeFFF: '#FFF4EE'
+}
+
+export default Colors
